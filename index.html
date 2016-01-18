@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta name="google-site-verification" content="oiR6BUxCQAa51JiKYDBz8jQ7E1ECNq6pecuawBnLuGM" />
+	<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+	<meta name="viewport" content="width=600, initial-scale=1">
+	<meta name="format-detection" content="telephone=no">
+	<meta name="description" content="A browser-based Mid/Side decoder." />
+	<meta name="keywords" content="audun vigdiss&oslash;nn nytr&oslash; space northpaw arctic kitten mid side decoder audio web field recording" />
+	<link href='//fonts.googleapis.com/css?family=Montserrat+Alternates' rel='stylesheet' type='text/css'>
+	<link rel="icon" href="favicon.ico" type="image/x-icon">
+	<link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
+	<title>msDecode</title>
+	<!-- IE8 HTML5 polyfill/shiv -->
+	<!--[if lt IE 9]>
+		<script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+	<![endif]-->
+	<link rel="stylesheet" type="text/css" href="main.css" >
+	<link href='https://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
+	<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css" rel="stylesheet">
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<script src="res/js/prefixfree.min.js"></script>
+	<script src="res/js/wavesurfer.min.js"></script>
+	<script src="res/js/audiocontext-polyfill.js"></script>
+
+	<!-- audio element handlers -->
+	<script>
+	$(document).ready(function() {
+		$('.msPlayer').each(function(){
+			msDecode(this);
+		});
+		localFileAudioPlayerInit(window);
+	});
+	</script>
+	<!-- msDecode script -->
+	<script>
+	function msDecode(container) {
+		var context = new AudioContext();
+		var parentID = $(container).attr("id");
+		var audio = document.querySelector("#" + parentID + " .player");
+		var source;
+
+		var sideGain = document.querySelector("#" + parentID + " .sideGainSlider");
+		var sideMuteButton = document.querySelector("#" + parentID + " .muteButton.side");
+		var midGain = document.querySelector("#" + parentID + " .midGainSlider");
+		var midMuteButton = document.querySelector("#" + parentID + " .muteButton.mid");
+		var masterGain = document.querySelector("#" + parentID + " .masterSlider");
+		var resetButton = document.querySelector("#" + parentID + " .resetButton");
+		var midMeter = document.querySelector("#" + parentID + " .midMeter");
+		var sideMeter = document.querySelector("#" + parentID + " .sideMeter");
+		var masterLeftMeter = document.querySelector("#" + parentID + " .masterMeter.left");
+		var masterRightMeter = document.querySelector("#" + parentID + " .masterMeter.right");
+
+		var splitter = context.createChannelSplitter(2);
+		var midLevel = context.createGain();
+		var sideLeft = context.createGain();
+		var sideRight = context.createGain();
+		var merger = context.createChannelMerger(2);
+		var output = context.createGain();
+		var silence = context.createBufferSource();
+		var masterMeterSplitter = context.createChannelSplitter(2);
+
+		sideLeft.gain.value = (sideGain.value)/1000;
+		sideRight.gain.value = -(sideGain.value)/1000;
+		midLevel.gain.value = (midGain.value)/1000;
+		output.gain.value = (masterGain.value)/100;
+
+		splitter.connect(midLevel, 0, 0);
+		splitter.connect(sideLeft, 1, 0);
+		splitter.connect(sideRight, 1, 0);
+		sideLeft.connect(merger, 0, 0);
+		sideRight.connect(merger, 0, 1);
+		midLevel.connect(merger, 0, 0);
+		midLevel.connect(merger, 0, 1);
+		merger.connect(output);
+		output.connect(context.destination);
+		output.connect(masterMeterSplitter);
+
+		sideGain.addEventListener('input', function () {
+			if (sideMuteButton.className.indexOf("muted") == -1) {
+				sideLeft.gain.value = (sideGain.value)/1000;
+				sideRight.gain.value = -(sideGain.value)/1000;
+			}
+		});
+
+		midGain.addEventListener('input', function () {
+			if (midMuteButton.className.indexOf("muted") == -1) {
+				midLevel.gain.value = (midGain.value)/1000;
+			}
+		});
+
+		masterGain.addEventListener('input', function () {
+			output.gain.value = (masterGain.value)/100;
+		});
+		
+		midMuteButton.addEventListener('click', function () {
+			$(midMuteButton).toggleClass("muted");
+			if (midMuteButton.className.indexOf("muted") != -1) {
+				midLevel.gain.value = 0;
+			} else {
+				midLevel.gain.value = (midGain.value)/1000;
+			}
+		});
+		
+		sideMuteButton.addEventListener('click', function () {
+			$(sideMuteButton).toggleClass("muted");
+			if (sideMuteButton.className.indexOf("muted") != -1) {
+				sideLeft.gain.value = 0;
+				sideRight.gain.value = 0;
+			} else {
+				sideLeft.gain.value = (sideGain.value)/1000;
+				sideRight.gain.value = -(sideGain.value)/1000;
+			}
+		});
+		
+		resetButton.addEventListener('click', function () {
+			$(sideMuteButton).removeClass("muted");
+			$(midMuteButton).removeClass("muted");
+			sideGain.value = sideGain.defaultValue;
+			midGain.value = midGain.defaultValue;
+			masterGain.value = masterGain.defaultValue;
+			midLevel.gain.value = (midGain.defaultValue)/1000;
+			sideLeft.gain.value = (sideGain.defaultValue)/1000;
+			sideRight.gain.value = -(sideGain.defaultValue)/1000;
+			output.gain.value = (masterGain.defaultValue)/100;
+		});
+
+		source = context.createMediaElementSource(audio);
+		source.connect(splitter);
+
+		var canvas = document.querySelector("#" + parentID + " .visualizer");
+		var canvasCtx = canvas.getContext("2d");
+		var WIDTH = canvas.width;
+		var HEIGHT = canvas.height;
+		canvas.setAttribute('width',WIDTH);
+
+		var drawVisual;
+
+		var analyser = context.createAnalyser();
+		analyser.fftSize = 256;
+		var bufferLength = analyser.frequencyBinCount;
+		var dataArray = new Uint8Array(bufferLength);
+		output.connect(analyser);
+		
+		var midAnalyser = context.createAnalyser();
+		midAnalyser.fftSize = 256;
+		var midBufferLength = midAnalyser.frequencyBinCount;
+		var midDataArray = new Uint8Array(midBufferLength);
+		midLevel.connect(midAnalyser, 0, 0);
+		
+		var sideAnalyser = context.createAnalyser();
+		sideAnalyser.fftSize = 256;
+		var sideBufferLength = sideAnalyser.frequencyBinCount;
+		var sideDataArray = new Uint8Array(sideBufferLength);
+		sideLeft.connect(sideAnalyser, 0, 0);
+		
+		var masterLeftAnalyser = context.createAnalyser();
+		masterLeftAnalyser.fftSize = 256;
+		var masterLeftBufferLength = masterLeftAnalyser.frequencyBinCount;
+		var masterLeftDataArray = new Uint8Array(masterLeftBufferLength);
+		masterMeterSplitter.connect(masterLeftAnalyser, 0, 0);
+
+		var masterRightAnalyser = context.createAnalyser();
+		masterRightAnalyser.fftSize = 256;
+		var masterRightBufferLength = masterRightAnalyser.frequencyBinCount;
+		var masterRightDataArray = new Uint8Array(masterRightBufferLength);
+		masterMeterSplitter.connect(masterRightAnalyser, 1, 0);
+		
+		canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
+
+		function draw() {
+			drawVisual = requestAnimationFrame(draw);
+			
+			// only do rendering if the audio element is playing
+			if (!audio.paused && !audio.ended && 0 < audio.currentTime) {
+				var WIDTH = canvas.offsetWidth;
+				var HEIGHT = canvas.offsetHeight;
+				canvasCtx.canvas.width  = WIDTH;
+				canvasCtx.canvas.height  = HEIGHT;
+
+				analyser.getByteFrequencyData(dataArray);
+
+				canvasCtx.fillStyle = "transparent";
+				canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+				var barWidth = (WIDTH / bufferLength);
+				var barHeight;
+				var x = 0;
+				
+				// mid meter
+				var midArray =  new Uint8Array(midAnalyser.frequencyBinCount);
+				midAnalyser.getByteFrequencyData(midDataArray);
+				var midAverage = getAverageVolume(midDataArray);
+				midMeter.value = midAverage;
+				
+				// side meter
+				var sideArray =  new Uint8Array(sideAnalyser.frequencyBinCount);
+				sideAnalyser.getByteFrequencyData(sideDataArray);
+				var sideAverage = getAverageVolume(sideDataArray);
+				sideMeter.value = sideAverage;
+				
+				// left master meter
+				var masterLeftArray =  new Uint8Array(masterLeftAnalyser.frequencyBinCount);
+				masterLeftAnalyser.getByteFrequencyData(masterLeftDataArray);
+				var masterLeftAverage = getAverageVolume(masterLeftDataArray);
+				masterLeftMeter.value = masterLeftAverage;
+				
+				// right master meter
+				var masterRightArray =  new Uint8Array(masterRightAnalyser.frequencyBinCount);
+				masterRightAnalyser.getByteFrequencyData(masterRightDataArray);
+				var masterRightAverage = getAverageVolume(masterRightDataArray);
+				masterRightMeter.value = masterRightAverage;
+
+				for(var i = 0; i < bufferLength; i++) {
+					barHeight = dataArray[i];
+
+					// that spectrograph won't draw itself
+					var grad = canvasCtx.createLinearGradient(0,0,0,barHeight);
+					grad.addColorStop(0,"#FFC507");
+					grad.addColorStop(1,"#1989F8");
+					canvasCtx.fillStyle=grad;
+					canvasCtx.fillRect(x,HEIGHT-(barHeight/256)*HEIGHT,barWidth,(barHeight/256)*HEIGHT);
+
+					x += barWidth + 1;
+				}
+			}
+		};
+		$(container).append("<div class='msWaveform'></div>");
+		draw();
+	}
+	</script>
+	<!-- array averaging function -->
+	<script>
+	function getAverageVolume(array) {
+		var values = 0;
+		var average;
+
+		var length = array.length;
+
+		// get amplitudes of all FFT frequency bins
+		for (var i = 0; i < length; i++) {
+			values += array[i];
+		}
+
+		average = values / length;
+		return average;
+	}
+	</script>
+	<!-- audio file input script -->
+	<script>
+	function localFileAudioPlayerInit(win) {
+	    var URL = win.URL || win.webkitURL,
+		displayMessage = (function displayMessageInit() {
+		    var node = document.querySelector('#message');
+		    return function displayMessage(message, isError) {
+			node.innerHTML = message;
+			node.className = isError ? 'error' : 'info';
+		    };
+		}()),
+		playSelectedFile = function playSelectedFileInit(event) {
+			document.querySelector(".msPlayer .msWaveform").innerHTML = "";
+		    var file = this.files[0];
+		    var type = file.type;
+		    if (document.querySelector(".msPlayer .player") == null) {
+			$(".msPlayer").append('<audio controls="controls" class="player" preload="metadata">');
+			$('.msPlayer').each(function(){
+				msDecode(this);
+			});
+		    }
+		    var audioNode = document.querySelector('.msPlayer .player');
+		    var canPlay = audioNode.canPlayType(type);
+		    canPlay = (canPlay === '' ? 'no' : canPlay);
+		    var message = 'Can play type "' + type + '": ' + canPlay;
+		    var isError = canPlay === 'no';
+		    displayMessage(message, isError);
+		    if (isError) {
+			return;
+		    }
+		    var fileURL = URL.createObjectURL(file);
+		    audioNode.src = fileURL;
+			if (!wavesurfer) {
+				var wavesurfer = Object.create(WaveSurfer);
+				wavesurfer.init({
+				container: document.querySelector(".msPlayer .msWaveform"),
+				backend: 'MediaElement',
+				waveColor: '#313C47',
+				normalize: 'true',
+				barWidth: '2',
+				splitChannels: 'true',
+				progressColor: '#1989F8',
+				mediaControls: 'true'
+				});
+			}
+			console.log("File size: "+file.size/1048576+" MB");
+			if(file.size/1048576 < 200) {
+				wavesurfer.load(fileURL);
+				wavesurfer.on('ready', function() {
+					$(".msPlayer .msWaveform .loadingOverlay").remove();
+					console.log("wavesurfer ready");
+				});
+				$(".msPlayer .msWaveform").append("<div class='loadingOverlay'><div class='loader'></div></div>");
+			}
+		},
+		inputNode = document.querySelector('.audioFileInput');
+	    if (!URL) {
+		displayMessage('Your browser is not ' + 
+		   '<a href="http://caniuse.com/bloburls">supported</a>!', true);
+		return;
+	    }                
+	    inputNode.addEventListener('change', playSelectedFile, false);
+	}
+	</script>
+</head>
+<body>
+	<div class="backgroundContainer">
+		<div class="sun"></div>
+		<div class="atmosphere"></div>
+	</div>
+	<div class="mainWrapper">
+		<div class="mainContainer">
+			<header class="mainHeader">
+				<div class="mainNavContainer">
+					<nav class="mainNav">
+						<div id="primaryNav">
+							<a href="http://471.no" target="_BLANK">
+								<div class="logo">
+									<span class="start">47</span><span class="end"><span class="mid">1</span>.no<div class="dash"></div></span><span class="msTitle"> / mid-side decoder</span>
+								</div>
+							</a>
+						</div>
+					</nav>
+				</div>
+			</header>
+
+			<main class="mainContent">
+			<article class="entry">
+			<div class="entryMain">
+				<input class="audioFileInput" type="file" accept="audio/*">
+				<div id="message"></div>
+				<div class="msPlayer" id="skansenDemo">
+					<canvas class="visualizer" width="480"></canvas>
+					<audio controls="controls" class="player" preload="metadata">
+						<p>Your browser does not support the <code>audio</code> element! : (</p>
+					</audio>
+					<meter class="midMeter" min="0" optimum="70" low="80" high="90" value="0" max="100"></meter>
+					<h3 class="midTitle">MID</h3>
+					<button class="muteButton mid">M</button><input class="midGainSlider" type="range" min="0" max="1000" value="500">
+					<meter class="sideMeter" min="0" optimum="70" low="80" high="90" value="0" max="100"></meter>
+					<h3 class="sideTitle">SIDE</h3>
+					<button class="muteButton side">M</button><input class="sideGainSlider" type="range" min="0" max="1000" value="0">
+					<meter class="masterMeter left" min="0" optimum="70" low="80" high="90" value="0" max="100"></meter>
+					<meter class="masterMeter right" min="0" optimum="70" low="80" high="90" value="0" max="100"></meter>
+					<h3 class="masterTitle">MASTER</h3>
+					<input class="masterSlider" type="range" min="0" max="1000" value="100"><button class="resetButton"><i class="fa fa-undo"></i></button>
+				</div>
+			</div>
+			</article>
+			</main>
+		</div>
+	</div>
+	
+	<!-- g analytics -->
+	<script>
+	  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+	  ga('create', 'UA-67266529-1', 'auto');
+	  ga('send', 'pageview');
+	</script>
+</body>
+</html>
