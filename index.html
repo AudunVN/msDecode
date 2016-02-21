@@ -335,7 +335,6 @@
 			<main class="mainContent">
 			<article class="entry">
 			<div class="entryMain">
-				<input id="ignoreFileSize" class="optionInput" type="checkbox"><label for="ignoreFileSize">Ignore maximum file size for waveform rendering</label>
 				<input class="audioFileInput" type="file" accept="audio/*">
 				<div id="message"></div>
 				<div class="msPlayer" id="skansenDemo">
@@ -354,6 +353,9 @@
 					<h3 class="masterTitle">MASTER</h3>
 					<input class="masterSlider" type="range" min="0" max="1000" value="100"><button class="resetButton"><i class="fa fa-undo"></i></button>
 				</div>
+				<h3>Options</h3>
+				<input id="ignoreFileSize" class="optionInput" type="checkbox"><label for="ignoreFileSize">Ignore maximum file size for waveform rendering</label>
+				<p>This may cause browser instability due to the amount of memory required by the Web Audio API for parsing and iterating over the entire file to render the waveform.</p>
 			</div>
 			</article>
 			</main>
