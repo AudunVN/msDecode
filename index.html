@@ -292,7 +292,7 @@
 				});
 			}
 			console.log("File size: "+file.size/1048576+" MB");
-			if(file.size/1048576 < 200) {
+			if(file.size/1048576 < 200 | document.getElementById("ignoreFileSize").checked) {
 				wavesurfer.load(fileURL);
 				wavesurfer.on('ready', function() {
 					$(".msPlayer .msWaveform .loadingOverlay").remove();
@@ -335,6 +335,7 @@
 			<main class="mainContent">
 			<article class="entry">
 			<div class="entryMain">
+				<input id="ignoreFileSize" class="optionInput" type="checkbox"><label for="ignoreFileSize">Ignore maximum file size for waveform rendering</label>
 				<input class="audioFileInput" type="file" accept="audio/*">
 				<div id="message"></div>
 				<div class="msPlayer" id="skansenDemo">
