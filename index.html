@@ -39,6 +39,11 @@
 		var parentID = $(container).attr("id");
 		var audio = document.querySelector("#" + parentID + " .player");
 		var source;
+		
+		document.addEventListener('click', function() {
+			/* quick fix for allowing audio playback in 2020 */
+			context.resume();
+		});
 
 		var sideGain = document.querySelector("#" + parentID + " .sideGainSlider");
 		var sideMuteButton = document.querySelector("#" + parentID + " .muteButton.side");
