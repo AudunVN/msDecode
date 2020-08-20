@@ -413,12 +413,13 @@ button.muteButton:active, button.resetButton:active {
 .msPlayer meter::-webkit-meter-bar {
     background: #EEE;
     box-shadow: 0 2px 3px rgba(0,0,0,0.2) inset;
-    border-radius: 0.2em
+    border-radius: 0.2em;
+    position: absolute;
 }
 
 .msPlayer meter::-webkit-meter-optimum-value {
     background: #86CC00;
-    border-radius: 0.2em
+    border-radius: 0.2em;
 }
 
 .msPlayer meter::-webkit-meter-suboptimum-value {
@@ -428,18 +429,18 @@ button.muteButton:active, button.resetButton:active {
 
 .msPlayer meter::-webkit-meter-even-less-good-value {
     background: #EC2C2C;
-    border-radius: 0.2em
+    border-radius: 0.2em;
 }
 
 .msPlayer meter {
     /* For Firefox */
     background: #EEE;
     box-shadow: 0 2px 3px rgba(0,0,0,0.2) inset;
-    border-radius: 0.2em
+    border-radius: 0.2em;
 }
 
 .msPlayer meter::-moz-meter-bar {
-    border-radius: 0.2em
+    border-radius: 0.2em;
 }
 
 .msPlayer meter:-moz-meter-optimum::-moz-meter-bar {
@@ -461,6 +462,7 @@ button.muteButton:active, button.resetButton:active {
 	position: absolute;
 	/* chrome and FF do not handle meter elements with height zero the same way. */
 	-moz-transform: translateY(1.55em);
+	left : 0.2em;
 }
 
 .msPlayer input[type=range]:focus {
